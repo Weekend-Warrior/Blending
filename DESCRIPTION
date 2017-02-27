@@ -9,11 +9,9 @@ License: BSD
 Encoding: UTF-8
 LazyData: true
 Depends:
-    reshape2,
-    data.table,
     R6,
-    caret,
-    xgboost,
-    lightgbm,
-    mxnet
+    caret (>= 6.0),
+    xgboost (>= 0.6),
+    lightgbm (>= 0.1),
+    mxnet (>= 0.9.4)
 RoxygenNote: 5.0.1

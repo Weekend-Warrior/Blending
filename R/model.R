@@ -2,31 +2,31 @@ Model = R6Class(
   classname = "Model",
   public = list(
     model = NULL,
+    preprocess = NULL,
     params = list(),
-    initialize = function(params) {
+
+    initialize = function(X, y, params, preprocess) {
       for (n in names(params)) {
         self$params[[n]] = params[[n]]
       }
+      self$preprocess = preprocess
+      self$model = self$train(X, y)
     },
 
-    train = function(x, y) {
-      # x: vars
-      # y: var
+    train = function(X, y) {
       stop("Not Implemented")
     },
 
-    predict = function(x) {
-      # x: vars
-      # ret: id, var
+    predict = function(X) {
       stop("Not Implemented")
     },
 
-    save = function(j) {
-      saveRDS(list(model = self$model, params = self$params), paste0(j, ".", class(self)[1]))
+    save = function(i) {
+      saveRDS(list(model = self$model, params = self$params), as.character(i))
     },
 
-    load = function(j) {
-      raw = readRDS(paste0(j, ".", class(self)[1]))
+    load = function(i) {
+      raw = readRDS(as.character(i))
       self$model = raw$model
       self$params = raw$params
     }
