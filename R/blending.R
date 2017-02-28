@@ -22,40 +22,56 @@ Blending = R6Class(
         preprocesses = default_preprocesses(models)
       }
 
-      n = length(y)
-      level = self$level(n, test_prop, train_prop)
-
       self$objective = objective
+      if (objective == "classification") {
+        y = as.factor(y)
+        private$class_tab = levels(y)
+        y = as.integer(y) - 1L
+      }
 
       self$m = length(models)
+
+      sink(tempfile())
+      newX = self$train(X, y, models, paramses, preprocesses, test_prop, train_prop)
+      sink()
+
+      if (objective == "classification") {
+        y = private$class_tab[y + 1]
+        newX = private$class_tab[newX + 1]
+      }
+
+      if (test_prop > 0) {
+        if (objective == "regression") {
+          mse = mean((newX - y)^2)
+          cat("MSE:\n", mse)
+        }
+        if (objective == "classification") {
+          confusion_matrix = table(data.frame(true = y, predict = newX)[level == i + 1,])
+          cat("confusion matrix:\n", confusion_matrix)
+        }
+      } else {
+        cat("No test data!\n")
+      }
+    },
+
+    train = function(X, y, models, paramses, preprocesses, test_prop, train_prop) {
+      n = length(y)
+      prop = c(train_prop * (1 - test_prop), test_prop)
+      ns = diff(c(0, n * cumsum(prop)))
+      level = sample(unlist(mapply(rep, 1:length(ns), ns)))
 
       for (i in 1:self$m) {
         if (i == 1) {
           fullX = X
         } else {
-          fullX = cbind(X, newX)
+          fullX = cbind(X, as.data.frame(newX))
         }
         index = level == i
         self$layers[[i]] = Layer$new(fullX[index, ], y[index], models[[i]], paramses[[i]], preprocesses[[i]])
         newX = self$layers[[i]]$predict(fullX)
       }
 
-      if (test_prop > 0) {
-        if (objective == "regression") {
-          cat()
-        }
-        if (objective == "classification") {
-          cat()
-        }
-      } else {
-        cat("No test set data!\n")
-      }
-    },
-
-    level = function(n, test_prop, train_prop) {
-      prop = c(train_prop * (1 - test_prop), test_prop)
-      ns = diff(c(0, n * cumsum(prop)))
-      sample(unlist(mapply(rep, 1:length(ns), ns)))
+      as.vector(newX)
     },
 
     predict = function(X) {
@@ -63,9 +79,12 @@ Blending = R6Class(
         if (i == 1) {
           fullX = X
         } else {
-          fullX = cbind(X, newX)
+          fullX = cbind(X, as.data.frame(newX))
         }
         newX = self$layers[[i]]$predict(fullX)
+      }
+      if (self$objective == "classification") {
+        newX = private$class_tab[newX + 1]
       }
       newX
     },
@@ -94,6 +113,9 @@ Blending = R6Class(
 
       setwd(curr)
     }
+  ),
+  private = list(
+    class_tab = NA
   )
 )
 

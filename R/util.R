@@ -29,6 +29,38 @@
 #' @param test_prop what's the proportion of test data
 #' @param train_prop what's the proportion of data for each layer training
 #' @return a blending model
+#' @examples
+#' # regression
+#' models = list(
+#'   list(Caret, XGBoost),
+#'   list(XGBoost))
+#'
+#' paramses = list(
+#'   list(list(method = 'bridge'), list(nrounds = 50)),
+#'   list(list(nrounds = 5)))
+#'
+#' preprocesses = default_preprocesses(models)
+#'
+#' X = iris[,1:3]
+#' y = iris[,4]
+#' m = blending(X, y, models, paramses, preprocesses, objective = "regression")
+#' predict(m, X)
+#'
+#' # classification
+#' models = list(
+#'   list(XGBoost, XGBoost),
+#'   list(XGBoost))
+#'
+#' paramses = list(
+#'   list(list(nrounds = 50, objective = "multi:softmax", num_class = 3), list(nrounds = 10, objective = "multi:softmax", num_class = 3)),
+#'   list(list(nrounds = 5, objective = "multi:softmax", num_class = 3)))
+#'
+#' preprocesses = default_preprocesses(models)
+#'
+#' X = iris[,1:4]
+#' y = iris[,5]
+#' m = blending(X, y, models, paramses, preprocesses, objective = "classification")
+#' predict(m, X)
 #' @export
 blending = function(
   X, y,

@@ -1,19 +1,18 @@
-NULL
-#' #' @export
-#' Caret = R6Class(
-#'   "Caret",
-#'   inherit = Model,
-#'   public = list(
-#'     train = function(x, y) {
-#'       params = self$params
-#'       params$x = x
-#'       params$y = y
-#'       self$model = do.call(caret::train, params)
-#'     },
-#'
-#'     predict = function(x) {
-#'       predict(self$model, x)
-#'     }
-#'   )
-#' )
-#'
+#' @export
+Caret = R6Class(
+  "Caret",
+  inherit = Model,
+  public = list(
+    train = function(X, y) {
+      params = self$params
+      params$x = self$preprocess(X)
+      params$y = y
+      self$model = do.call(caret::train, params)
+    },
+
+    predict = function(X) {
+      predict(self$model, X)
+    }
+  )
+)
+

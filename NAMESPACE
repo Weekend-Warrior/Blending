@@ -2,6 +2,7 @@
 
 S3method(predict,Blending)
 export(Blending)
+export(Caret)
 export(XGBoost)
 export(blending)
 export(default_preprocesses)
