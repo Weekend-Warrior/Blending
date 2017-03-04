@@ -8,7 +8,9 @@ Layer = R6Class(
       self$m = length(models)
 
       for (i in 1:self$m) {
+        cat("Start training model", i, "\n")
         self$models[[i]] = models[[i]]$new(X, y, paramses[[i]], preprocesses[[i]])
+        cat("Stop training model", i, "\n")
       }
     },
 

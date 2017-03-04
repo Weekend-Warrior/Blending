@@ -3,14 +3,16 @@ XGBoost = R6Class(
   "XGBoost",
   inherit = Model,
   public = list(
-    params = list(nrounds = 100),
+    params = list(
+      train = list(nrounds = 100),
+      predict = list()),
 
     preprocess_ = function(X) {
       as.matrix(self$preprocess(X))
     },
 
     train = function(X, y) {
-      params = self$params
+      params = self$params$train
       params$data = xgboost::xgb.DMatrix(self$preprocess_(X), label = as.matrix(y))
       self$model = do.call(xgboost::xgb.train, params)
     },

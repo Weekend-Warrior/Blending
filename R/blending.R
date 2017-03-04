@@ -31,9 +31,14 @@ Blending = R6Class(
 
       self$m = length(models)
 
+      n = length(y)
+      prop = c(train_prop * (1 - test_prop), test_prop)
+      ns = diff(c(0, n * cumsum(prop)))
+      level = sample(unlist(mapply(rep, 1:length(ns), ns)))
+
       sink(tempfile())
-      newX = self$train(X, y, models, paramses, preprocesses, test_prop, train_prop)
-      sink()
+      newX = self$train(X, y, models, paramses, preprocesses, test_prop, train_prop, level)
+      sink(NULL)
 
       if (objective == "classification") {
         y = private$class_tab[y + 1]
@@ -42,11 +47,11 @@ Blending = R6Class(
 
       if (test_prop > 0) {
         if (objective == "regression") {
-          mse = mean((newX - y)^2)
+          mse = mean((newX - y)[level == self$m + 1]^2)
           cat("MSE:\n", mse)
         }
         if (objective == "classification") {
-          confusion_matrix = table(data.frame(true = y, predict = newX)[level == i + 1,])
+          confusion_matrix = table(data.frame(true = y, predict = newX)[level == self$m + 1,])
           cat("confusion matrix:\n", confusion_matrix)
         }
       } else {
@@ -54,12 +59,7 @@ Blending = R6Class(
       }
     },
 
-    train = function(X, y, models, paramses, preprocesses, test_prop, train_prop) {
-      n = length(y)
-      prop = c(train_prop * (1 - test_prop), test_prop)
-      ns = diff(c(0, n * cumsum(prop)))
-      level = sample(unlist(mapply(rep, 1:length(ns), ns)))
-
+    train = function(X, y, models, paramses, preprocesses, test_prop, train_prop, level) {
       for (i in 1:self$m) {
         if (i == 1) {
           fullX = X
@@ -67,7 +67,9 @@ Blending = R6Class(
           fullX = cbind(X, as.data.frame(newX))
         }
         index = level == i
+        cat("Start training layer", i, "\n")
         self$layers[[i]] = Layer$new(fullX[index, ], y[index], models[[i]], paramses[[i]], preprocesses[[i]])
+        cat("Stop training layer", i, "\n")
         newX = self$layers[[i]]$predict(fullX)
       }
 
@@ -86,7 +88,7 @@ Blending = R6Class(
       if (self$objective == "classification") {
         newX = private$class_tab[newX + 1]
       }
-      newX
+      as.vector(newX)
     },
 
     save = function(path) {

@@ -3,11 +3,14 @@ Model = R6Class(
   public = list(
     model = NULL,
     preprocess = NULL,
-    params = list(),
+    params = list(train = list(), predict = list()),
 
     initialize = function(X, y, params, preprocess) {
-      for (n in names(params)) {
-        self$params[[n]] = params[[n]]
+      for (n in names(params$train)) {
+        self$params$train[[n]] = params[[n]]
+      }
+      for (n in names(params$predict)) {
+        self$params$predict[[n]] = params[[n]]
       }
       self$preprocess = preprocess
       self$model = self$train(X, y)
