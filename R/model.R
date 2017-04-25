@@ -1,38 +1,155 @@
-Model = R6Class(
-  classname = "Model",
+#' @export
+Caret = R6Class(
+  "Caret",
+  inherit = Model,
   public = list(
-    model = NULL,
-    preprocess = NULL,
-    params = list(train = list(), predict = list()),
-
-    initialize = function(X, y, params, preprocess) {
-      for (n in names(params$train)) {
-        self$params$train[[n]] = params[[n]]
-      }
-      for (n in names(params$predict)) {
-        self$params$predict[[n]] = params[[n]]
-      }
-      self$preprocess = preprocess
-      self$model = self$train(X, y)
-    },
-
     train = function(X, y) {
-      stop("Not Implemented")
+      params = self$train_param
+      params$x = X
+      params$y = y
+      self$model = do.call(caret::train, params)
     },
 
     predict = function(X) {
-      stop("Not Implemented")
-    },
-
-    save = function(i) {
-      saveRDS(list(model = self$model, params = self$params), as.character(i))
-    },
-
-    load = function(i) {
-      raw = readRDS(as.character(i))
-      self$model = raw$model
-      self$params = raw$params
+      as.vector(predict(self$model, X))
     }
   )
 )
 
+#' @export
+XGBoost = R6Class(
+  "XGBoost",
+  inherit = Model,
+  public = list(
+    train_param = list(nrounds = 100),
+
+    train = function(X, y) {
+      params = self$train_param
+      params$data = xgboost::xgb.DMatrix(X, label = as.vector(y))
+      self$model = do.call(xgboost::xgb.train, params)
+    },
+
+    predict = function(X) {
+      xgboost:::predict.xgb.Booster(self$model, xgboost::xgb.DMatrix(X))
+    },
+
+    save = function(i, j) {
+      xgboost::xgb.save(self$model, paste0(i, "_", j))
+    },
+
+    load = function(i, j) {
+      f = paste0(i, "_", j)
+      if(file.exists(f)) {
+        self$model = xgboost::xgb.load(f)
+      } else {
+        self$model = NULL
+      }
+    }
+  )
+)
+
+#' @export
+LightGBM = R6Class(
+  "LightGBM",
+  inherit = Model,
+  public = list(
+    train_param = list(
+      verbose = 0,
+      params = list(
+        objective = "regression",
+        metric = "l2"),
+      nrounds = 100,
+      min_data=1
+    ),
+
+    train = function(X, y) {
+      params = self$train_param
+      params$data = lightgbm::lgb.Dataset(X, label = as.vector(y))
+      self$model = do.call(lightgbm::lgb.train, params)
+    },
+
+    predict = function(X) {
+      lightgbm:::predict.lgb.Booster(self$model, X)
+    },
+
+    save = function(i, j) {
+      lightgbm::lgb.save(self$model, paste0(i, "_", j))
+    },
+
+    load = function(i, j) {
+      f = paste0(i, "_", j)
+      if(file.exists(f)) {
+        self$model = lightgbm::lgb.load(f)
+      } else {
+        self$model = NULL
+      }
+    }
+  )
+)
+
+#' @export
+MLP = R6Class(
+  "MLP",
+  inherit = Model,
+  public = list(
+    train_param = list(
+      num.round = 100,
+      array.layout = "rowmajor",
+      array.batch.size = 1,
+      initializer = mx.init.Xavier(),
+      optimizer = "rmsprop",
+      out_node = 1,
+      out_activation = "rmse"
+    ),
+
+    train = function(x, y) {
+      params = self$train_param
+      params$data = data.matrix(x)
+      params$label = y
+      params$arg.params = self$model$arg.params
+      params$aux.params = self$model$aux.params
+      self$model = do.call(mxnet::mx.mlp, params)
+    },
+
+    predict = function(x) {
+      as.vector(mxnet:::predict.MXFeedForwardModel(self$model, data.matrix(x), array.layout = "rowmajor"))
+    },
+
+    save = function(i, j) {
+      mxnet::mx.model.save(self$model, paste0(i, "_", j), 0)
+    },
+
+    load = function(i, j) {
+      f = paste0(i, "_", j)
+      if(file.exists(paste0(f, "-symbol.json"))) {
+        self$model = mxnet::mx.model.load(f, 0)
+        self$train_param$symbol = self$model$symbol
+      } else {
+        self$model = NULL
+      }
+    }
+  )
+)
+
+#' @export
+FeedForward = R6Class(
+  "FeedForward",
+  inherit = MLP,
+  public = list(
+    train_param = list(
+      num.round = 100,
+      array.layout = "rowmajor",
+      array.batch.size = 1,
+      initializer = mx.init.Xavier(),
+      optimizer = "rmsprop"
+    ),
+    train = function(x, y) {
+      params = self$train_param
+      params$X = data.matrix(x)
+      params$y = y
+      params$arg.params = self$model$arg.params
+      params$aux.params = self$model$aux.params
+      self$model = do.call(mxnet::mx.model.FeedForward.create, params)
+    }
+  )
+)

@@ -1,123 +1,161 @@
-#' Blending class
-#'
-#' @export
-Blending = R6Class(
-  classname = "Blending",
-  public = list(
-    m = NA,
-    layers = list(),
-    objective = NULL,
+sample_int_ratio = function(n, r) {
+  i = diff(c(0, floor(quantile(1:n, cumsum(r)))))
+  sample(unlist(sapply(1:length(i), function(x) rep(x, i[x])))) - 1
+}
 
-    initialize = function(X, y, models, paramses, preprocesses, objective, test_prop, train_prop) {
+update_param = function(default, customize) {
+  for (name in names(customize)) {
+    default[[name]] = customize[[name]]
+  }
+  default
+}
 
-      if (!all(sapply(models, length) == sapply(paramses, length))) {
-        stop("Number of models do not match number of parameter list!")
-      }
+Model = R6Class(
+  "Model",
+  list(
+    train_param = NULL,
+    predict_param = NULL,
+    model = NULL,
 
-      if (nrow(X) != length(y)) {
-        stop("Number of X do not match number of y!")
-      }
-
-      if (is.null(preprocesses)) {
-        preprocesses = default_preprocesses(models)
-      }
-
-      self$objective = objective
-      if (objective == "classification") {
-        y = as.factor(y)
-        private$class_tab = levels(y)
-        y = as.integer(y) - 1L
-      }
-
-      self$m = length(models)
-
-      n = length(y)
-      prop = c(train_prop * (1 - test_prop), test_prop)
-      ns = diff(c(0, n * cumsum(prop)))
-      level = sample(unlist(mapply(rep, 1:length(ns), ns)))
-
-      sink(tempfile())
-      newX = self$train(X, y, models, paramses, preprocesses, test_prop, train_prop, level)
-      sink(NULL)
-
-      if (objective == "classification") {
-        y = private$class_tab[y + 1]
-        newX = private$class_tab[newX + 1]
-      }
-
-      if (test_prop > 0) {
-        if (objective == "regression") {
-          mse = mean((newX - y)[level == self$m + 1]^2)
-          cat("MSE:\n", mse)
-        }
-        if (objective == "classification") {
-          confusion_matrix = table(data.frame(true = y, predict = newX)[level == self$m + 1,])
-          cat("confusion matrix:\n", confusion_matrix)
-        }
-      } else {
-        cat("No test data!\n")
-      }
+    initialize = function(train_param = NULL, predict_param = NULL) {
+      self$train_param = update_param(self$train_param, train_param)
+      self$predict_param = update_param(self$predict_param, predict_param)
     },
 
-    train = function(X, y, models, paramses, preprocesses, test_prop, train_prop, level) {
-      for (i in 1:self$m) {
-        if (i == 1) {
-          fullX = X
-        } else {
-          fullX = cbind(X, as.data.frame(newX))
-        }
-        index = level == i
-        cat("Start training layer", i, "\n")
-        self$layers[[i]] = Layer$new(fullX[index, ], y[index], models[[i]], paramses[[i]], preprocesses[[i]])
-        cat("Stop training layer", i, "\n")
-        newX = self$layers[[i]]$predict(fullX)
-      }
-
-      as.vector(newX)
+    train = function(X, y) {
+      stop("Not Implemented")
     },
 
     predict = function(X) {
-      for (i in 1:self$m) {
-        if (i == 1) {
-          fullX = X
-        } else {
-          fullX = cbind(X, as.data.frame(newX))
-        }
-        newX = self$layers[[i]]$predict(fullX)
-      }
-      if (self$objective == "classification") {
-        newX = private$class_tab[newX + 1]
-      }
-      as.vector(newX)
+      stop("Not Implemented")
     },
 
-    save = function(path) {
-      curr = getwd()
-
-      dir.create(path, FALSE, TRUE)
-      setwd(path)
-
-      for (i in 1:self$m) {
-        self$layers[[i]]$save(i)
-      }
-
-      setwd(curr)
+    save = function(i, j) {
+      saveRDS(list(train_param = self$train_param, predict_param = self$predict_param, model = self$model),
+              paste0(i, "_", j))
     },
 
-    load = function(path) {
-      curr = getwd()
-
-      setwd(path)
-
-      for (i in 1:self$m) {
-        self$layers[[i]]$load(i)
+    load = function(i, j) {
+      f = paste0(i, "_", j)
+      if(file.exists(f)) {
+        tmp = readRDS(f)
+        self$model = tmp$model
+        self$train_param = tmp$train_param
+        self$predict_param = tmp$predict_param
       }
-
-      setwd(curr)
     }
-  ),
-  private = list(
-    class_tab = NA
   )
 )
 
+Layer = R6Class(
+  "Layer",
+  list(
+    n = NA,
+    player = NULL,
+    models = NULL,
+
+    initialize = function(models, player = NULL) {
+      self$n = length(models)
+      self$models = models
+      self$player = player
+    },
+
+    add_previous_prediction = function(X) {
+      if (is.null(self$player)) {
+        return(X)
+      } else {
+        return(cbind(X, self$player$predict(X)))
+      }
+    },
+
+    train = function(X, y) {
+      X = self$add_previous_prediction(X)
+      invisible(lapply(self$models, function(model) model$train(X, y)))
+    },
+
+    predict = function(X) {
+      X = self$add_previous_prediction(X)
+      do.call(cbind, lapply(self$models, function(model) model$predict(X)))
+    },
+
+    save = function(i) {
+      for (j in 1:self$n) {
+        self$models[[i]]$save(i, j)
+      }
+    },
+
+    load = function(i) {
+      for (j in 1:self$n) {
+        self$models[[i]]$load(i, j)
+      }
+    }
+  )
+)
+
+Blending = R6Class(
+  "Blending",
+  list(
+    n = NA,
+    layers = NULL,
+
+    initialize = function(layers) {
+      self$n = length(layers)
+      self$layers = layers
+      for (i in 2:self$n) {
+        self$layers[[i]]$player = self$layers[[i-1]]
+      }
+    },
+
+    train = function(X, y, test_prop = 0.1, train_prop = c(0.7, 0.3), metric = function(yhat, y) sqrt(mean((y-yhat)^2))) {
+      n = length(y)
+
+      ratio = c(test_prop, (1 - test_prop) * train_prop)
+      index = sample_int_ratio(n, ratio)
+
+      test_X = X[index == 0,]
+      test_y = y[index == 0]
+
+      for (i in 1:self$n) {
+        sub_index = index == i
+        cat(sprintf("Train layer %d with %d observations\n", i, sum(sub_index)))
+        self$layers[[i]]$train(X[sub_index,], y[sub_index])
+      }
+
+      if (test_prop > 0) {
+        cat(sprintf("Metric on test set: %2.2f\n", metric(self$predict(test_X), test_y)))
+      }
+    },
+
+    predict = function(X) {
+      self$layers[[self$n]]$predict(X)
+    },
+
+    save = function() {
+      current_wd = getwd()
+      model_wd = paste0(current_wd, "/model_file")
+      dir.create(model_wd, FALSE)
+      setwd(model_wd)
+      for (i in 1:self$n) {
+        self$layers[[i]]$save(i)
+      }
+      setwd(current_wd)
+    },
+
+    load = function() {
+      current_wd = getwd()
+      model_wd = paste0(current_wd, "/model_file")
+      for (i in 1:self$n) {
+        self$layers[[i]]$load(i)
+      }
+      setwd(current_wd)
+    }
+  )
+)
+
+#' @export
+blending = function(X, y, model_lists, test_prop = 0.1, train_prop = c(0.7, 0.3), metric = function(yhat, y) sqrt(mean((y-yhat)^2))) {
+  layers = lapply(model_lists, function(model_list) Layer$new(model_list))
+  ret = Blending$new(layers)
+  ret$train(X, y, test_prop, train_prop, metric)
+  ret
+}
