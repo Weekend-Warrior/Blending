@@ -16,10 +16,20 @@ Model = R6Class(
     train_param = NULL,
     predict_param = NULL,
     model = NULL,
+    preprocess_ = NULL,
 
-    initialize = function(train_param = NULL, predict_param = NULL) {
+    preprocess = function(X) {
+      if (!is.null(self$preprocess_)) {
+        return(self$preprocess_(X))
+      } else {
+        return(X)
+      }
+    },
+
+    initialize = function(train_param = NULL, predict_param = NULL, preprocess = NULL) {
       self$train_param = update_param(self$train_param, train_param)
       self$predict_param = update_param(self$predict_param, predict_param)
+      self$preprocess_ = preprocess
     },
 
     train = function(X, y) {
@@ -80,13 +90,13 @@ Layer = R6Class(
 
     save = function(i) {
       for (j in 1:self$n) {
-        self$models[[i]]$save(i, j)
+        self$models[[j]]$save(i, j)
       }
     },
 
     load = function(i) {
       for (j in 1:self$n) {
-        self$models[[i]]$load(i, j)
+        self$models[[j]]$load(i, j)
       }
     }
   )
@@ -106,7 +116,7 @@ Blending = R6Class(
       }
     },
 
-    train = function(X, y, test_prop = 0.1, train_prop = c(0.7, 0.3), metric = function(yhat, y) sqrt(mean((y-yhat)^2))) {
+    train = function(X, y, test_prop = 0.1, train_prop = c(0.7, 0.3), metric = metric_mse) {
       n = length(y)
 
       ratio = c(test_prop, (1 - test_prop) * train_prop)
@@ -153,7 +163,7 @@ Blending = R6Class(
 )
 
 #' @export
-blending = function(X, y, model_lists, test_prop = 0.1, train_prop = c(0.7, 0.3), metric = function(yhat, y) sqrt(mean((y-yhat)^2))) {
+blending = function(X, y, model_lists, test_prop = 0.1, train_prop = c(0.7, 0.3), metric = metric_mse) {
   layers = lapply(model_lists, function(model_list) Layer$new(model_list))
   ret = Blending$new(layers)
   ret$train(X, y, test_prop, train_prop, metric)

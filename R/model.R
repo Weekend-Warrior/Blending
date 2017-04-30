@@ -5,13 +5,13 @@ Caret = R6Class(
   public = list(
     train = function(X, y) {
       params = self$train_param
-      params$x = X
+      params$x = self$preprocess(X)
       params$y = y
       self$model = do.call(caret::train, params)
     },
 
     predict = function(X) {
-      as.vector(predict(self$model, X))
+      as.vector(predict(self$model, self$preprocess(X)))
     }
   )
 )
@@ -25,12 +25,12 @@ XGBoost = R6Class(
 
     train = function(X, y) {
       params = self$train_param
-      params$data = xgboost::xgb.DMatrix(X, label = as.vector(y))
+      params$data = xgboost::xgb.DMatrix(self$preprocess(X), label = as.vector(y))
       self$model = do.call(xgboost::xgb.train, params)
     },
 
     predict = function(X) {
-      xgboost:::predict.xgb.Booster(self$model, xgboost::xgb.DMatrix(X))
+      xgboost:::predict.xgb.Booster(self$model, xgboost::xgb.DMatrix(self$preprocess(X)))
     },
 
     save = function(i, j) {
@@ -64,12 +64,12 @@ LightGBM = R6Class(
 
     train = function(X, y) {
       params = self$train_param
-      params$data = lightgbm::lgb.Dataset(X, label = as.vector(y))
+      params$data = lightgbm::lgb.Dataset(self$preprocess(X), label = as.vector(y))
       self$model = do.call(lightgbm::lgb.train, params)
     },
 
     predict = function(X) {
-      lightgbm:::predict.lgb.Booster(self$model, X)
+      lightgbm:::predict.lgb.Booster(self$model, self$preprocess(X))
     },
 
     save = function(i, j) {
@@ -102,17 +102,17 @@ MLP = R6Class(
       out_activation = "rmse"
     ),
 
-    train = function(x, y) {
+    train = function(X, y) {
       params = self$train_param
-      params$data = data.matrix(x)
+      params$data = data.matrix(self$preprocess(X))
       params$label = y
       params$arg.params = self$model$arg.params
       params$aux.params = self$model$aux.params
       self$model = do.call(mxnet::mx.mlp, params)
     },
 
-    predict = function(x) {
-      as.vector(mxnet:::predict.MXFeedForwardModel(self$model, data.matrix(x), array.layout = "rowmajor"))
+    predict = function(X) {
+      as.vector(mxnet:::predict.MXFeedForwardModel(self$model, data.matrix(self$preprocess(self$preprocess(X))), array.layout = "rowmajor"))
     },
 
     save = function(i, j) {
@@ -143,9 +143,9 @@ FeedForward = R6Class(
       initializer = mx.init.Xavier(),
       optimizer = "rmsprop"
     ),
-    train = function(x, y) {
+    train = function(X, y) {
       params = self$train_param
-      params$X = data.matrix(x)
+      params$X = data.matrix(self$preprocess(X))
       params$y = y
       params$arg.params = self$model$arg.params
       params$aux.params = self$model$aux.params

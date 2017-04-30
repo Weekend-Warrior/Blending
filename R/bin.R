@@ -5,13 +5,13 @@ Bin_Caret = R6Class(
   public = list(
     train = function(X, y) {
       params = self$train_param
-      params$x = X
+      params$x = self$preprocess(X)
       params$y = as.factor(y)
       self$model = do.call(caret::train, params)
     },
 
     predict = function(X) {
-      as.integer(predict(self$model, X)) - 1
+      as.integer(predict(self$model, self$preprocess(X))) - 1
     }
   )
 )

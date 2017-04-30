@@ -5,13 +5,13 @@ Mlt_Caret = R6Class(
   public = list(
     train = function(X, y) {
       params = self$train_param
-      params$x = X
+      params$x = self$preprocess(X)
       params$y = as.factor(y)
       self$model = do.call(caret::train, params)
     },
 
     predict = function(X) {
-      as.integer(predict(self$model, X)) - 1
+      as.integer(predict(self$model, self$preprocess(X))) - 1
     }
   )
 )
@@ -25,12 +25,12 @@ Mlt_XGBoost = R6Class(
     train = function(X, y) {
       params = self$train_param
       params$num_class = max(y) + 1
-      params$data = xgboost::xgb.DMatrix(X, label = as.vector(y))
+      params$data = xgboost::xgb.DMatrix(self$preprocess(X), label = as.vector(y))
       self$model = do.call(xgboost::xgb.train, params)
     },
 
     predict = function(X) {
-      xgboost:::predict.xgb.Booster(self$model, xgboost::xgb.DMatrix(X), reshape = TRUE)
+      xgboost:::predict.xgb.Booster(self$model, xgboost::xgb.DMatrix(self$preprocess(X)), reshape = TRUE)
     }
   )
 )
@@ -52,12 +52,12 @@ Mlt_LightGBM = R6Class(
     train = function(X, y) {
       params = self$train_param
       params$num_class = max(y) + 1
-      params$data = lightgbm::lgb.Dataset(X, label = as.vector(y))
+      params$data = lightgbm::lgb.Dataset(self$preprocess(X), label = as.vector(y))
       self$model = do.call(lightgbm::lgb.train, params)
     },
 
     predict = function(X) {
-      lightgbm:::predict.lgb.Booster(self$model, X, reshape = TRUE)
+      lightgbm:::predict.lgb.Booster(self$model, self$preprocess(X), reshape = TRUE)
     }
   )
 )

@@ -1,3 +1,4 @@
+library(Blending)
 ## Test Model Class
 # # REG
 #
@@ -81,3 +82,5 @@ model_2_1 = XGBoost$new()
 model = blending(X, y, list(list(model_1_1, model_1_2), list(model_2_1)))
 model$predict(X)
 
+model$save()
+model$load()
